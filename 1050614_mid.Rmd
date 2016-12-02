@@ -1,0 +1,230 @@
+---
+title: "1050614_mid"
+author: "Lin Zhao-Hui"
+date: "2016年11月18日"
+output: html_document
+---
+
+###期中考
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#載入套件
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(vegan)
+library(ape)
+library(stats)
+library(data.table)
+library(BiodiversityR)
+library(nortest)
+```
+
+##一. 請隨機產生 10000 組正整數儲存成 vector 格式，並輸出成 random10k.csv (5%)
+
+```{r}
+#隨機產生10000組正整數
+x <- sample.int(10000)
+#輸出成 random10k.csv
+write.csv(x, 'C:\\Users/parasiter/Desktop/random10k.csv', row.names = FALSE)
+```
+
+##二. 請使用 for 迴圈列出 15 個費布納西(Fibonacci)數列 (10%)
+```{r}
+#將費布納西數列寫成fibonacci()的function
+fibonacci <- function(i) {
+  #當i =  1時輸出 0，當 i = 2 時輸出 0,1
+  if( i == 1 ){
+     x <- c(0)
+    }else if ( i == 2 ){
+      x <- c(0,1)
+    }else{
+        x <- c(0,1)
+      for ( n in 3:i ) {
+        n <- length(x)
+        new <- x[n] + x[n-1]
+        x <- c(x,new)
+      }
+    }
+    return(x)
+}
+#列出15個
+fibonacci(15) 
+```
+
+##三. 請將 sample_data.txt 輸入進 R 內，並完成以下計算 (55%)
+```{r}
+#讀資料,並將沒有資料的字串視為NA
+data <- read.table("C:\\Users/parasiter/Desktop/sample_data.txt", header = TRUE, na.strings = c(-9996,-9997,-9999))
+```
+
+#(a) 將 yyyymmddhh 轉成 POSIXct 時間戳記格式， 並新增為一個欄(variable)，命名為 timestamp。並將此 sample data 輸出為 sample_data_parsed.csv (以逗號分隔，具有欄位名稱)
+```{r}
+#新增 timestamp 欄位
+data["timestamp"] <- NA
+#將 yyyymmddhh 時間格式轉換成 POSIXct 格式,並-1修正
+data$timestamp <- as.POSIXct(strptime(data$yyyymmddhh-1, "%Y%m%d%H", tz = ""))
+#輸出為 sample_data_parsed.csv
+write.csv(data, 'C:\\Users/parasiter/Desktop/sample_data_parsed.csv', row.names = FALSE, col.names = TRUE, sep = ",")
+```
+
+#(b) 請計算 2014 年至 2015 年這個測站的每月平均氣溫、每月平均濕度、每月累積降水， 並用表格呈現。表格範例如下：
+```{r}
+#先在新增一欄time，等等要separate
+data["time"] <- NA
+data$time <-  as.POSIXct(strptime(data$yyyymmddhh-1, "%Y%m%d%H", tz = ""))
+#新增 year , month , day 欄位
+data <- separate(data = data, col = time, c("year","month","day"))
+#將每月平均氣溫、每月平均濕度、每月累積降水算出來
+TX <- aggregate(TX01 ~ month, data = data , FUN = mean) 
+RH <- aggregate(RH01 ~ month, data = data , FUN = mean)
+PP <- aggregate(PP01 ~ month, data = data , FUN = sum)
+
+#轉置，然後合併成表格
+table1 <- data.frame(t(cbind(TX[,2] , RH[,2] , PP[,2])))
+
+#設定欄、列名稱
+rownames(table1) <- c("月平均氣溫","月平均濕度","月累積降水")
+colnames(table1) <- c("1","2","3","4","5","6","7","8","9","10","11","12")
+
+#表格呈現
+print(table1)
+```
+
+#(c) 請計算 2014 年和 2015 年最冷月分別是在哪個月份？(提示：先計算月均溫)
+```{r}
+#分出2014年，算出月平均
+TX.2014avg <- data[data$year == "2014",] %>% group_by(month) %>% summarise(TX.avg = mean(TX01, na.rm = TRUE)) %>% data.frame()
+#找出最低溫，2014年最冷月為1月
+TX.2014avg[order(TX.2014avg$TX.avg),]
+
+
+#分出2015年，算出月平均
+TX.2015avg <- data[data$year == "2015",] %>% group_by(month) %>% summarise(TX.avg = mean(TX01, na.rm = TRUE)) %>% data.frame()
+#找出最低溫，2015年最冷月為1月
+TX.2015avg[order(TX.2015avg$TX.avg),]
+```
+
+#(d) 在 2015 年最冷的那個月份中，該月中每日的最低溫平均是幾度C？
+```{r}
+#挑出2015年
+TX.2015daymin <- data[data$year == "2015",]
+#挑出1月，找出每日最低溫
+TX.2015daymin <- TX.2015daymin[TX.2015daymin$month == "01",] %>% group_by(day) %>% summarise(min = min(TX01, na.rm = TRUE)) %>% data.frame()
+#計算每日最低溫平均
+TX.2015daymin %>% summarise(avg = mean(min))
+```
+#(e) 請計算 2014 年和 2015 年中，最熱的月分別是在哪個月份？
+```{r}
+#分出2014年，算出月平均
+TX.2014avgmax <- data[data$year == "2014",] %>% group_by(month) %>% summarise(avg = mean(TX01, na.rm = TRUE)) %>% data.frame()
+#找出最高溫，2014年最熱月為7月
+TX.2014avgmax[order(-TX.2014avgmax$avg),]
+
+#分出2015年，算出月平均
+TX.2015avgmax <- data[data$year == "2015",] %>% group_by(month) %>% summarise(avg = mean(TX01, na.rm = TRUE)) %>% data.frame()
+#找出最高溫，2015年最熱月為6月
+TX.2015avgmax[order(-TX.2015avgmax$avg),]
+```
+
+#(f) 請計算 2014 年最熱的月份中，該月的每日最高溫平均為幾度C?
+```{r}
+#挑出2014年
+TX.2014daymax <- data[data$year == "2014",]
+#挑出7月，找出每日最高溫
+TX.2014daymax <- TX.2014daymax[TX.2014daymax$month == "01",] %>% group_by(day) %>% summarise(max = max(TX01, na.rm = TRUE)) %>% data.frame()
+#計算每日最高溫平均
+TX.2014daymax %>% summarise(avg = mean(max))
+```
+
+#(g) 請算出 2014 至 2015 年中，最濕月份的平均溫度
+```{r}
+#挑出year,month,TX01,RH01，合併year,month
+RH.max.avgTX <- select(data, year,month,TX01,RH01)  %>% unite(yearmonth,year,month)
+#算出TX,RH平均
+RH.max.avgTX <- merge(RH.max.avgTX %>% group_by(yearmonth) %>% summarise(TX.avg = mean(TX01, na.rm = TRUE)),RH.max.avgTX %>% group_by(yearmonth) %>% summarise(RH.avg = mean(RH01, na.rm = TRUE)), by = "yearmonth")
+#找出最濕月份的平均溫度，最濕月分為2014年9月，平均溫度為28.75835
+RH.max.avgTX[order(-RH.max.avgTX$RH.avg),]
+
+```
+
+#(h) 請計算每個月的月溫差(每月最高溫減去每月最高溫，取兩年平均)，平均月溫差最大的是哪個月？
+```{r}
+#挑出year,month,TX01,RH01，合併year,month
+TX.maxmin <- select(data, year, month, TX01)  %>% unite(yearmonth,year,month)
+#挑出最高溫與最低溫
+TX.maxmin <- merge(TX.maxmin %>% group_by(yearmonth) %>% summarise(max = max(TX01, na.rm = TRUE)), TX.maxmin %>% group_by(yearmonth) %>% summarise(min = min(TX01, na.rm = TRUE)), by = "yearmonth")
+#計算溫差
+TX.maxmin <- mutate(TX.maxmin, maxmin = max - min)
+#分開yearmonth
+TX.maxmin <- separate(TX.maxmin, yearmonth, c("year","month"))
+#計算平均
+TX.maxmin <- TX.maxmin %>% group_by(month) %>% summarise(avg = mean(maxmin))
+#找出平均月溫差最大
+TX.maxmin[order(-TX.maxmin$avg),]
+```
+#(i) 請計算這兩年的年溫差平均(每年最高溫減去最低溫)
+```{r}
+#挑出year,TX01
+TX.yearmaxmin <- select(data, year,TX01)
+#挑出最高溫與最低溫
+TX.yearmaxmin <- merge(TX.yearmaxmin %>% group_by(year) %>% summarise(max = max(TX01, na.rm = TRUE)), TX.yearmaxmin %>% group_by(year) %>% summarise(min = min(TX01, na.rm = TRUE)), by = "year")
+#計算年溫差
+TX.yearmaxmin <- mutate(TX.yearmaxmin, maxmin = max - min)
+#平均年溫差
+summarise(TX.yearmaxmin,avg = mean(maxmin))
+```
+#(j) 溫量指數(warmth index)是 Kira (1945) 提出的一個生態氣候指標，其計算方式為:
+
+  (1) 若該月均溫高於 5 ºC，則將該月份的月均溫減去 5 ºC。
+  (2) 若該月均溫低於或等於 5 ºC，則令其為 0 ºC
+  (3) 將所有減去 5 ºC 或當成 0 ºC 的月均溫相加起來得到的數據稱為「溫量指數」
+
+  請根據 (b) 所計算出的數值，算出 2014 至 2015 年的溫量指數。
+```{r}
+#沒有狀況(2)，所以全部-5相加
+warmth <- sum(table1[1,1:12]-5)
+warmth
+
+```
+#(k) 請使用 climatol package 繪製 2014 至 2015 的生態氣候圖(Ecological climate diagrams)。 提示：你需要計算出每個月的累積降水平均、每日最高溫平均、每日最低溫平均、每月絕對最低溫。 可參考繪製生態氣候圖
+```{r}
+#將每個月的累積降水平均、每日最高溫平均、每日最低溫平均、每月絕對最低溫算出來
+dia <- merge(data %>% group_by(month) %>% summarise(Prec. = sum(PP01, na.rm = TRUE)/2) , separate(unite(select(data,year,month,day,TX01),yearmonthday,year,month,day) %>% group_by(yearmonthday) %>% summarise(max = max(TX01, na.rm = TRUE)),yearmonthday,c("year","month","day")) %>% group_by(month) %>% summarise(Max.t. = mean(max, na.rm = TRUE)) , by = "month")
+dia <- merge(dia , separate(unite(select(data,year,month,day,TX01),yearmonthday,year,month,day) %>% group_by(yearmonthday) %>% summarise(min = min(TX01, na.rm = TRUE)),yearmonthday,c("year","month","day")) %>% group_by(month) %>% summarise(Min.t. = mean(min, na.rm = TRUE)), by = "month")
+dia <- merge(dia , data %>% group_by(month) %>% summarise(Ab.m.t. = min(TX01, na.rm = TRUE)), by = "month")
+#轉置
+dia <- t(dia[,2:5])
+#修改column name
+colnames(dia) <- c("Jan", "Feb",	"Mar",	"Apr",	"May",	"Jun",	"Jul",	"Aug",	"Sep",	"Oct",	"Nov",	"Dec")
+
+
+#畫圖
+library(climatol)
+library(Cairo)
+
+# 設定工作目錄
+setwd('C:\\Users/parasiter/Desktop')
+# 設定字型，這裡使用 Noto Sans T Chinese
+CairoFonts(regular = "Noto Sans T Chinese:style=Light", bold = "Noto Sans T Chinese:style=Regular")
+par(family='Noto Sans T Chinese')
+
+# custom function to draw climatic diagrams
+exportEcoDiag <- function(climfile, station_name, filename, data_period) {
+  climdata <- climfile  
+  Cairo(1600, 1600, file=filename, type="png", bg="white", dpi=300)
+  diagwl(climdata, est=station_name, per=data_period)
+  dev.off()
+}
+
+#輸出
+exportEcoDiag(dia, 'Ecological climate diagrams', 'mid.png', '2014-2015')
+```
+
+
+#四. 請計算 Table 2 中的下列各子題 (30%)
+
+#(a) 請計算各島環境因子(total_cover, C, EC, ..., etc.) 的平均、 第一四分位數、中位數、第三四分位數、最大值及最小值以及標準差，並整理成如下表格：
+
+
+
